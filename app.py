@@ -258,3 +258,7 @@ if st.button("Run Full AI Audit", use_container_width=True):
             st.write("🔍 Check www.whois.com")
 
         st.success("Audit Complete!")
+
+        # Footer
+st.markdown("---")
+st.caption("AI Auditor v1.0 | Powered by Data Science, eBEYONDS")
