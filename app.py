@@ -20,6 +20,21 @@ st.markdown("""
     .report-card { border: 1px solid #e0e0e0; padding: 20px; border-radius: 10px; background: #fff; margin-bottom: 20px; }
     small { color: #5f6368; }
     .status-label { font-weight: bold; color: #1a73e8; }
+    
+    /* --- LOADING ANIMATION CSS --- */
+    .loader {
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #4285F4;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -234,6 +249,9 @@ if st.button("Run Full AI Audit", use_container_width=True):
         st.error("Please enter a valid URL (include https://)")
     else:
         with st.spinner("Analyzing all digital touchpoints..."):
+            # Display the visual animation during analysis
+            st.markdown('<div class="loader"></div>', unsafe_allow_html=True)
+            
             is_indexed = check_google_index(url_input)
             mobile_score, mobile_checks = analyze_mobile_responsiveness(url_input)
             social_links = check_social_links(url_input)
