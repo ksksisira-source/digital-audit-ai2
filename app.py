@@ -67,6 +67,32 @@ def analyze_mobile_responsiveness(url):
     except:
         return 0, ["Could not analyze responsiveness."]
 
+def check_social_links(url):
+    """Checks for social media presence on the website"""
+    social_platforms = {
+        "Facebook": ["facebook.com", "fb.com"],
+        "Instagram": ["instagram.com"],
+        "Twitter/X": ["twitter.com", "x.com"],
+        "LinkedIn": ["linkedin.com"],
+        "YouTube": ["youtube.com"],
+        "TikTok": ["tiktok.com"]
+    }
+    found_links = {}
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        links = [a.get('href', '') for a in soup.find_all('a')]
+        
+        for platform, patterns in social_platforms.items():
+            for link in links:
+                if any(p in link.lower() for p in patterns):
+                    found_links[platform] = link
+                    break
+        return found_links
+    except:
+        return {}
+
 def get_real_speed(url):
     api_url = f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={url}&key={PAGESPEED_API_KEY}"
     try:
@@ -191,6 +217,7 @@ if st.button("Run Full AI Audit", use_container_width=True):
         with st.spinner("Analyzing all digital touchpoints..."):
             is_indexed = check_google_index(url_input)
             mobile_score, mobile_checks = analyze_mobile_responsiveness(url_input)
+            social_links = check_social_links(url_input)
             speed = get_real_speed(url_input)
             brand = extract_brand_info(url_input)
             img_score, img_total = analyze_images(url_input)
@@ -240,6 +267,17 @@ if st.button("Run Full AI Audit", use_container_width=True):
                     st.write(f"<small>{check}</small>", unsafe_allow_html=True)
 
             st.divider()
+            # New Social Media Audit Section
+            st.subheader("📲 Social Media Presence")
+            if social_links:
+                s_col1, s_col2 = st.columns(2)
+                for i, (platform, link) in enumerate(social_links.items()):
+                    with (s_col1 if i % 2 == 0 else s_col2):
+                        st.write(f"✅ **{platform}:** [Link]({link})")
+            else:
+                st.info("No social media links detected on the homepage.")
+
+            st.divider()
             st.subheader("🌐 Domain & Hosting Intelligence")
             h1, h2 = st.columns(2)
             with h1:
@@ -259,6 +297,6 @@ if st.button("Run Full AI Audit", use_container_width=True):
 
         st.success("Audit Complete!")
 
-        # Footer
+# Footer
 st.markdown("---")
 st.caption("AI Auditor v1.0 | Powered by Data Science, eBEYONDS")
