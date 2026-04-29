@@ -9,7 +9,7 @@ import whois
 from datetime import datetime
 
 # --- CONFIG ---
-PAGESPEED_API_KEY = "AIzaSyD1r7vZU9kJbeU5W3gmz2ZJ1xMdb_RPzsA" 
+PAGESPEED_API_KEY = st.secrets["PAGESPEED_API_KEY"]
 
 st.set_page_config(page_title="Digital Audit AI", page_icon="🔍", layout="wide")
 
