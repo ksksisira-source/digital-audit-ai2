@@ -32,12 +32,40 @@ def check_google_index(url):
         search_url = f"https://www.google.com/search?q=site:{domain}"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
         response = requests.get(search_url, headers=headers, timeout=5)
-        # If 'did not match any documents' is NOT in the text, it's likely indexed
         if "did not match any documents" not in response.text and response.status_code == 200:
             return True
         return False
     except:
         return False
+
+def analyze_mobile_responsiveness(url):
+    """Checks for technical mobile responsiveness indicators"""
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1'}
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        viewport = soup.find('meta', attrs={'name': 'viewport'})
+        has_media_queries = "@media" in response.text
+        
+        score = 0
+        checks = []
+        
+        if viewport:
+            score += 50
+            checks.append("✅ Viewport Meta Tag found.")
+        else:
+            checks.append("❌ Missing Viewport Meta Tag.")
+            
+        if has_media_queries:
+            score += 50
+            checks.append("✅ CSS Media Queries detected.")
+        else:
+            checks.append("⚠️ Limited CSS Media Queries found.")
+            
+        return score, checks
+    except:
+        return 0, ["Could not analyze responsiveness."]
 
 def get_real_speed(url):
     api_url = f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={url}&key={PAGESPEED_API_KEY}"
@@ -132,7 +160,6 @@ def get_hosting_details(url):
             "Location": w.country or "Global"
         }
     except:
-        # Fallback if WHOIS is blocked
         return {
             "Domain": domain.upper(),
             "IP": ip_address,
@@ -163,6 +190,7 @@ if st.button("Run Full AI Audit", use_container_width=True):
     else:
         with st.spinner("Analyzing all digital touchpoints..."):
             is_indexed = check_google_index(url_input)
+            mobile_score, mobile_checks = analyze_mobile_responsiveness(url_input)
             speed = get_real_speed(url_input)
             brand = extract_brand_info(url_input)
             img_score, img_total = analyze_images(url_input)
@@ -171,7 +199,6 @@ if st.button("Run Full AI Audit", use_container_width=True):
 
             st.divider()
             
-            # Show Google Index Status first
             if is_indexed:
                 st.success("✅ Google Index: This website is indexed on Google.")
             else:
@@ -201,6 +228,16 @@ if st.button("Run Full AI Audit", use_container_width=True):
                 st.subheader("🤝 User Friendly")
                 st.metric("UX Score", f"{ux_score}%")
                 for n in ux_notes: st.write(f"• <small>{n}</small>", unsafe_allow_html=True)
+
+            st.divider()
+            # New Mobile Responsiveness Section
+            st.subheader("📱 Mobile Responsiveness")
+            m_col1, m_col2 = st.columns([1, 2])
+            with m_col1:
+                st.metric("Mobile Ready", f"{mobile_score}%")
+            with m_col2:
+                for check in mobile_checks:
+                    st.write(f"<small>{check}</small>", unsafe_allow_html=True)
 
             st.divider()
             st.subheader("🌐 Domain & Hosting Intelligence")
