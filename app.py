@@ -93,6 +93,25 @@ def check_social_links(url):
     except:
         return {}
 
+def check_blog_presence(url):
+    """Checks for the existence of a blog or news section"""
+    blog_keywords = ['blog', 'news', 'articles', 'resources', 'insights']
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        links = soup.find_all('a')
+        
+        for link in links:
+            text = link.get_text().lower()
+            href = link.get('href', '').lower()
+            if any(keyword in text or keyword in href for keyword in blog_keywords):
+                full_url = href if href.startswith('http') else url.rstrip('/') + '/' + href.lstrip('/')
+                return True, full_url
+        return False, None
+    except:
+        return False, None
+
 def get_real_speed(url):
     api_url = f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={url}&key={PAGESPEED_API_KEY}"
     try:
@@ -218,6 +237,7 @@ if st.button("Run Full AI Audit", use_container_width=True):
             is_indexed = check_google_index(url_input)
             mobile_score, mobile_checks = analyze_mobile_responsiveness(url_input)
             social_links = check_social_links(url_input)
+            has_blog, blog_url = check_blog_presence(url_input)
             speed = get_real_speed(url_input)
             brand = extract_brand_info(url_input)
             img_score, img_total = analyze_images(url_input)
@@ -257,7 +277,7 @@ if st.button("Run Full AI Audit", use_container_width=True):
                 for n in ux_notes: st.write(f"• <small>{n}</small>", unsafe_allow_html=True)
 
             st.divider()
-            # New Mobile Responsiveness Section
+            # Mobile Responsiveness Section
             st.subheader("📱 Mobile Responsiveness")
             m_col1, m_col2 = st.columns([1, 2])
             with m_col1:
@@ -267,15 +287,23 @@ if st.button("Run Full AI Audit", use_container_width=True):
                     st.write(f"<small>{check}</small>", unsafe_allow_html=True)
 
             st.divider()
-            # New Social Media Audit Section
-            st.subheader("📲 Social Media Presence")
-            if social_links:
-                s_col1, s_col2 = st.columns(2)
-                for i, (platform, link) in enumerate(social_links.items()):
-                    with (s_col1 if i % 2 == 0 else s_col2):
+            # Social Media & Content Section
+            sc_col1, sc_col2 = st.columns(2)
+            with sc_col1:
+                st.subheader("📲 Social Media Presence")
+                if social_links:
+                    for platform, link in social_links.items():
                         st.write(f"✅ **{platform}:** [Link]({link})")
-            else:
-                st.info("No social media links detected on the homepage.")
+                else:
+                    st.info("No social media links detected.")
+            
+            with sc_col2:
+                st.subheader("✍️ Content & Blogs")
+                if has_blog:
+                    st.write(f"✅ **Blog/News Section Found**")
+                    st.write(f"<small>[View Blog Section]({blog_url})</small>", unsafe_allow_html=True)
+                else:
+                    st.warning("❌ No Blog/News section detected.")
 
             st.divider()
             st.subheader("🌐 Domain & Hosting Intelligence")
