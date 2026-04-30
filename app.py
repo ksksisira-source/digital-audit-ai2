@@ -25,6 +25,55 @@ st.markdown("""
 
 # --- ANALYSIS ENGINES ---
 
+def check_tracking_scripts(url):
+    """Detects Google Analytics 4 and Meta Pixel"""
+    results = {"GA4": False, "Meta Pixel": False}
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        page_text = response.text
+        
+        # GA4 detection (looking for G-XXXXXXX patterns or googletagmanager)
+        if re.search(r'G-[A-Z0-9]{10}', page_text) or "googletagmanager.com/gtag/js" in page_text:
+            results["GA4"] = True
+            
+        # Meta Pixel detection
+        if "connect.facebook.net/en_US/fbevents.js" in page_text or "fbq('init'" in page_text:
+            results["Meta Pixel"] = True
+            
+        return results
+    except:
+        return results
+
+def check_chat_agent(url):
+    """Detects if a live chat agent or chatbot is available on the site"""
+    chat_providers = {
+        "Intercom": ["intercom.io", "intercomcdn.com", "intercom-js"],
+        "Zendesk": ["zendesk.com", "zopim.com", "zopim.js"],
+        "Tidio": ["tidio.co", "tidiochat.com"],
+        "LiveChat": ["livechatinc.com", "livechat.js"],
+        "HubSpot": ["hubspot.com/js-static/chatbot"],
+        "Drift": ["drift.com", "driftt.js"],
+        "Crisp": ["crisp.chat", "client.crisp.chat"],
+        "WhatsApp": ["wa.me", "api.whatsapp.com"],
+        "Facebook Messenger": ["connect.facebook.net/en_US/sdk/xfbml.customerchat.js"]
+    }
+    found_chat = []
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        scripts = [s.get('src', '') for s in soup.find_all('script') if s.get('src')]
+        page_text = response.text.lower()
+
+        for provider, patterns in chat_providers.items():
+            if any(p in page_text for p in patterns) or any(any(p in s for p in patterns) for s in scripts):
+                found_chat.append(provider)
+        
+        return list(set(found_chat))
+    except:
+        return []
+
 def check_google_index(url):
     """Checks if the domain is indexed on Google"""
     try:
@@ -92,6 +141,30 @@ def check_social_links(url):
         return found_links
     except:
         return {}
+
+def check_social_reviews(social_links):
+    """Attempts to find review patterns in social media landing pages"""
+    review_data = {}
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    
+    for platform, link in social_links.items():
+        try:
+            response = requests.get(link, headers=headers, timeout=5)
+            text = response.text.lower()
+            
+            stars = re.search(r'(\d\.?\d?)\s?out of 5 stars', text)
+            rating_val = re.search(r'rating:\s?(\d\.?\d?)', text)
+            
+            if stars:
+                review_data[platform] = f"Rating found: {stars.group(1)}/5"
+            elif rating_val:
+                review_data[platform] = f"Rating found: {rating_val.group(1)}"
+            else:
+                review_data[platform] = "Reviews present (Link detected)"
+        except:
+            review_data[platform] = "Check manually (Privacy restrictions)"
+            
+    return review_data
 
 def check_blog_presence(url):
     """Checks for the existence of a blog or news section"""
@@ -237,12 +310,15 @@ if st.button("Run Full AI Audit", use_container_width=True):
             is_indexed = check_google_index(url_input)
             mobile_score, mobile_checks = analyze_mobile_responsiveness(url_input)
             social_links = check_social_links(url_input)
+            review_status = check_social_reviews(social_links)
             has_blog, blog_url = check_blog_presence(url_input)
             speed = get_real_speed(url_input)
             brand = extract_brand_info(url_input)
             img_score, img_total = analyze_images(url_input)
             ux_score, ux_notes = analyze_ux(url_input)
             host = get_hosting_details(url_input)
+            chat_agents = check_chat_agent(url_input)
+            tracking = check_tracking_scripts(url_input) # New tracking check
 
             st.divider()
             
@@ -277,6 +353,17 @@ if st.button("Run Full AI Audit", use_container_width=True):
                 for n in ux_notes: st.write(f"• <small>{n}</small>", unsafe_allow_html=True)
 
             st.divider()
+            # Tracking & Marketing Intelligence (Added Section)
+            st.subheader("📊 Tracking & Marketing Intelligence")
+            t_col1, t_col2 = st.columns(2)
+            with t_col1:
+                status = "✅ Installed" if tracking["GA4"] else "❌ Not Found"
+                st.write(f"**Google Analytics 4 (GA4):** {status}")
+            with t_col2:
+                status = "✅ Connected" if tracking["Meta Pixel"] else "❌ Not Found"
+                st.write(f"**Meta Pixel:** {status}")
+
+            st.divider()
             # Mobile Responsiveness Section
             st.subheader("📱 Mobile Responsiveness")
             m_col1, m_col2 = st.columns([1, 2])
@@ -287,7 +374,7 @@ if st.button("Run Full AI Audit", use_container_width=True):
                     st.write(f"<small>{check}</small>", unsafe_allow_html=True)
 
             st.divider()
-            # Social Media & Content Section
+            # Social Media, Content & Chat Section
             sc_col1, sc_col2 = st.columns(2)
             with sc_col1:
                 st.subheader("📲 Social Media Presence")
@@ -296,6 +383,14 @@ if st.button("Run Full AI Audit", use_container_width=True):
                         st.write(f"✅ **{platform}:** [Link]({link})")
                 else:
                     st.info("No social media links detected.")
+                
+                st.write("")
+                st.subheader("💬 Live Chat Support")
+                if chat_agents:
+                    for agent in chat_agents:
+                        st.write(f"✅ **{agent}** detected")
+                else:
+                    st.info("No live chat agent detected.")
             
             with sc_col2:
                 st.subheader("✍️ Content & Blogs")
@@ -304,6 +399,16 @@ if st.button("Run Full AI Audit", use_container_width=True):
                     st.write(f"<small>[View Blog Section]({blog_url})</small>", unsafe_allow_html=True)
                 else:
                     st.warning("❌ No Blog/News section detected.")
+
+            st.divider()
+            st.subheader("⭐ Reviews & Reputation")
+            if review_status:
+                rev_col1, rev_col2 = st.columns(2)
+                for i, (platform, status) in enumerate(review_status.items()):
+                    target_col = rev_col1 if i % 2 == 0 else rev_col2
+                    target_col.write(f"**{platform}:** {status}")
+            else:
+                st.info("No social media channels found to check reviews.")
 
             st.divider()
             st.subheader("🌐 Domain & Hosting Intelligence")
@@ -325,6 +430,5 @@ if st.button("Run Full AI Audit", use_container_width=True):
 
         st.success("Audit Complete!")
 
-# Footer
 st.markdown("---")
 st.caption("AI Auditor v1.0 | Powered by Data Science, eBEYONDS")
